@@ -1,0 +1,8 @@
+.DS_Store
+cv_worker
+inetclient
+serverds
+*.dSYM/
+serv_files/output_dedup/*
+.vscode/
+.clang-tidy

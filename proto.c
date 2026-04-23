@@ -21,7 +21,7 @@ despacheteze (deserializeze) la destinațtie
 
 msgHeaderType peekMsgHeader(int sock)
 { // Use this function to 'peek' into message structure. Take a look, it doesn't heart :)
-    size_t bytes_read;
+    ssize_t bytes_read;
     msgHeaderType hdr;
     hdr.msgSize = htonl(sizeof(hdr));
     bytes_read = recv(sock, &hdr, sizeof(hdr), MSG_PEEK | MSG_WAITALL);
@@ -66,7 +66,7 @@ int writeSingleInt(int sock, msgHeaderType hdr, int val)
     msg_struct.header.opID = htonl(hdr.opID);
     msg_struct.i.msg = htonl(val);
     msg_struct.header.msgSize = htonl(sizeof(msg_struct));
-    size_t bytes_sent;
+    ssize_t bytes_sent;
     bytes_sent = send(sock, &msg_struct, sizeof(msg_struct), 0);
     if (bytes_sent == -1)
     {
@@ -104,7 +104,7 @@ int writeMultiInt(int sock, msgHeaderType hdr, int val1, int val2)
     msg_struct.i.msg1 = htonl(val1);
     msg_struct.i.msg2 = htonl(val2);
     msg_struct.header.msgSize = htonl(sizeof(msg_struct));
-    size_t bytes_sent;
+    ssize_t bytes_sent;
     bytes_sent = send(sock, &msg_struct, sizeof(msg_struct), 0);
     if (bytes_sent == -1)
     {
@@ -145,7 +145,7 @@ int writeSingleString(int sock, msgHeaderType hdr, char *str)
     Send the real string next. No Padding!
      */
 
-    size_t bytes_sent;
+    ssize_t bytes_sent;
     int strSize = strlen(str);
     bytes_sent = writeSingleInt(sock, hdr, strSize);
     if (bytes_sent == -1)

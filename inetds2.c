@@ -52,7 +52,7 @@ int static inet_socket(uint16_t port, short reuse)
     return sock;
 }
 
-int static create_client_id()
+int static create_client_id(void)
 {
     /* Create some unique ID. e.g. UNIX timestamp... */
     char ctsmp[12];
