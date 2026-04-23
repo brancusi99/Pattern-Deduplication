@@ -1,18 +1,22 @@
 #include <pthread.h>
 #include <stdio.h>
-#include <ncurses.h>
+//#include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
+//#include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/select.h>
+//#include <sys/select.h>
 #include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+//#include <netdb.h>
+//#include <arpa/inet.h>
 #include "proto.h"
+#include "inttypes.h"
+#include "time.h"
+#include "sys/select.h"
+#include "sys/wait.h"
 
-int inet_socket(uint16_t port, short reuse)
+int static inet_socket(uint16_t port, short reuse)
 {
     int sock;
     struct sockaddr_in name;
@@ -48,7 +52,7 @@ int inet_socket(uint16_t port, short reuse)
     return sock;
 }
 
-int create_client_id()
+int static create_client_id()
 {
     /* Create some unique ID. e.g. UNIX timestamp... */
     char ctsmp[12];
@@ -66,20 +70,14 @@ int create_client_id()
     return uuid;
 }
 
-int extract_client_operation(char *data)
-{
-
-    return -1;
-}
-
-
 //functia rulata de inetthr din server.c
 void *inet_main(void *args)
 {
     int port = *((int *)args);
     int sock;
     size_t size;
-    fd_set active_fd_set, read_fd_set;
+    fd_set active_fd_set;
+    fd_set read_fd_set;
     struct sockaddr_in clientname;
 
     //serverul creeaza socketul, incepe sa asculte si adauga acest socket 
@@ -104,7 +102,7 @@ void *inet_main(void *args)
 
     while (1)
     {
-        int i;
+        int cnt;
         /* Block until input arrives on one or more active sockets. */
         read_fd_set = active_fd_set;
         if (select(FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0)
@@ -113,15 +111,15 @@ void *inet_main(void *args)
         }
 
         /* Service all the sockets with input pending. */
-        for (i = 0; i < FD_SETSIZE; ++i)
+        for (cnt = 0; cnt < FD_SETSIZE; ++cnt){
             //daca un socket e marcat FD_ISSET, inseamna ca are date
-            if (FD_ISSET(i, &read_fd_set))
+            if (FD_ISSET(cnt, &read_fd_set))
             {
                 //daca este socketul principal (i==sock) 
                 //are o conexiune noua
                 //serverul apelează accept(), obtine un socket nou pentru 
                 //acest client si il adauga in lista de ascultare (FD_SET)
-                if (i == sock)
+                if (cnt == sock)
                 { /* Connection request on original socket. */
                     int new;
                     size = sizeof(clientname);
@@ -143,13 +141,13 @@ void *inet_main(void *args)
                     Pe baza informatiei din header, se decide operatia de urmat
 
                     */
-                    msgHeaderType h = peekMsgHeader(i);
-                    if ((clientID = h.clientID) < 0)
+                    msgHeaderType hdr = peekMsgHeader(cnt);
+                    if ((clientID = hdr.clientID) < 0)
                     {
                         // Protocol error: missing client ID. Close connection
                         fprintf(stderr, "There's something wrong! Negative ClientID.\t Closing connection, probably the client was terminated.\n");
-                        close(i);
-                        FD_CLR(i, &active_fd_set);
+                        close(cnt);
+                        FD_CLR(cnt, &active_fd_set);
                     }
                     else
                     {
@@ -157,20 +155,20 @@ void *inet_main(void *args)
                         if (clientID == 0)
                         {
                             int newID;
-                            msgIntType m;
+                            msgIntType msg;
                             newID = create_client_id();
                             fprintf(stderr, "\tDetected new client! New clientID: %d\n", newID);
-                            if (readSingleInt(i, &m) < 0)
+                            if (readSingleInt(cnt, &msg) < 0)
                             {
                                 // Cannot read from client. This is impossible :) Close connection!
-                                close(i);
-                                FD_CLR(i, &active_fd_set);
+                                close(cnt);
+                                FD_CLR(cnt, &active_fd_set);
                             }
-                            if (writeSingleInt(i, h, newID) < 0)
+                            if (writeSingleInt(cnt, hdr, newID) < 0)
                             {
                                 // Cannot write to client. Close connection!
-                                close(i);
-                                FD_CLR(i, &active_fd_set);
+                                close(cnt);
+                                FD_CLR(cnt, &active_fd_set);
                             }
                         }
                         else
@@ -178,11 +176,11 @@ void *inet_main(void *args)
                             /* YOU SHOULD CHECK IF THIS IS AN EXISTING CLIENT !!! */
                             int operation;//, dsize;
 
-                            operation = h.opID;
+                            operation = hdr.opID;
                             if (operation == -1)
                             { // Protocol error: missing or incorect operation
-                                close(i);
-                                FD_CLR(i, &active_fd_set);
+                                close(cnt);
+                                FD_CLR(cnt, &active_fd_set);
                             }
 
 
@@ -193,8 +191,8 @@ void *inet_main(void *args)
                                 {
                                     msgStringType input_dir;
                                     //citeste numele folderului trimis de client (ex: "client_files/batch1")
-                                    if (readSingleString(i, &input_dir) < 0) {
-                                        close(i); FD_CLR(i, &active_fd_set);
+                                    if (readSingleString(cnt, &input_dir) < 0) {
+                                        close(cnt); FD_CLR(cnt, &active_fd_set);
                                     }
                                     
                                     char output_dir[256] = "serv_files/output_dedup"; //aici salevaza rezultatul
@@ -214,9 +212,9 @@ void *inet_main(void *args)
                                         waitpid(pid, &status, 0);
 
                                         if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-                                            writeSingleString(i, h, "Procesare OpenCV completă! Fisier salvat pe server.");
+                                            writeSingleString(cnt, hdr, "Procesare OpenCV completă! Fisier salvat pe server.");
                                         } else {
-                                            writeSingleString(i, h, "Eroare in procesarea OpenCV.");
+                                            writeSingleString(cnt, hdr, "Eroare in procesarea OpenCV.");
                                         }
                                     }
                                     free(input_dir.msg);
@@ -225,14 +223,15 @@ void *inet_main(void *args)
 
                             case OPR_BYE:
                             default:
-                                close(i);
-                                FD_CLR(i, &active_fd_set);
+                                close(cnt);
+                                FD_CLR(cnt, &active_fd_set);
                                 break;
                             }
                         }
                     }
                 }
             }
+        }
     }
 
     pthread_exit(NULL);

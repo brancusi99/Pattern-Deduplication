@@ -64,10 +64,10 @@ typedef struct multiStringMsg
 } multiStringType;
 
 msgHeaderType peekMsgHeader(int sock);                               // Use this function to 'peek' into messge structure. Take a look, it doesn't heart :)
-int readSingleInt(int sock, msgIntType *m);                          // Simple read/write facilities for SingleInt
-int readMultiInt(int sock, msgIntType *m1, msgIntType *m2);          // Simple read/write facilities for MultiInt
-int readSingleString(int sock, msgStringType *m);                    // Simple read/write facilities for singleString
-int writeSingleInt(int sock, msgHeaderType h, int i);                // Build the message and send it!
-int writeMultiInt(int sock, msgHeaderType h, int i1, int i2);        // Build the message and send it!
-int writeSingleString(int sock, msgHeaderType h, char *s);           // Build the message and send it!
+int readSingleInt(int sock, msgIntType *msg_in);                         // Simple read/write facilities for SingleInt
+int readMultiInt(int sock, msgIntType *msg1, msgIntType *msg2);          // Simple read/write facilities for MultiInt
+int readSingleString(int sock, msgStringType *str);                   // Simple read/write facilities for singleString
+int writeSingleInt(int sock, msgHeaderType hdr, int val);              // Build the message and send it!
+int writeMultiInt(int sock, msgHeaderType hdr, int val1, int val2);      // Build the message and send it!
+int writeSingleString(int sock, msgHeaderType hdr, char *str);        // Build the message and send it!
 int writeMultiString(int sock, msgHeaderType h, char *s1, char *s2); // Build the message and send it!

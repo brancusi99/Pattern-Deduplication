@@ -1,14 +1,8 @@
-#include <pthread.h>
 #include <stdio.h>
-#include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/select.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include <arpa/inet.h>
 #include "proto.h"
 
@@ -27,102 +21,102 @@ despacheteze (deserializeze) la destinațtie
 
 msgHeaderType peekMsgHeader(int sock)
 { // Use this function to 'peek' into message structure. Take a look, it doesn't heart :)
-    size_t nb;
-    msgHeaderType h;
-    h.msgSize = htonl(sizeof(h));
-    nb = recv(sock, &h, sizeof(h), MSG_PEEK | MSG_WAITALL);
+    size_t bytes_read;
+    msgHeaderType hdr;
+    hdr.msgSize = htonl(sizeof(hdr));
+    bytes_read = recv(sock, &hdr, sizeof(hdr), MSG_PEEK | MSG_WAITALL);
     // Mandatory conversions!
-    h.msgSize = ntohl(h.msgSize);
-    h.clientID = ntohl(h.clientID);
-    h.opID = ntohl(h.opID);
+    hdr.msgSize = ntohl(hdr.msgSize);
+    hdr.clientID = ntohl(hdr.clientID);
+    hdr.opID = ntohl(hdr.opID);
 
     // End of mandatory conversions!
-    if (nb == -1)
+    if (bytes_read == -1)
     {
-        h.opID = h.clientID = -1; // Something weird happened!
+        hdr.opID = hdr.clientID = -1; // Something weird happened!
     }
-    if (nb == 0)
+    if (bytes_read == 0)
     {
-        h.opID = h.clientID = OPR_BYE; // Connection closed for some reason. Just close it!
+        hdr.opID = hdr.clientID = OPR_BYE; // Connection closed for some reason. Just close it!
     }
 #ifdef DEBUG
-    fprintf(stderr, "\tReceived msgHeader: %d %d, %d (%ld)\n", h.msgSize, h.clientID, h.opID, nb);
+    fprintf(stderr, "\tReceived msgHeader: %d %d, %d (%ld)\n", hdr.msgSize, hdr.clientID, hdr.opID, bytes_read);
 #endif
-    return h;
+    return hdr;
 }
 
-int readSingleInt(int sock, msgIntType *m)
+int readSingleInt(int sock, msgIntType *msg_in)
 { // Simple read/write facilities for SingleInt
-    size_t nb;
-    singleIntMsgType s;
-    nb = recv(sock, &s, sizeof(s), MSG_WAITALL);
-    if (nb <= 0)
+    size_t bytes_read;
+    singleIntMsgType msg_struct;
+    bytes_read = recv(sock, &msg_struct, sizeof(msg_struct), MSG_WAITALL);
+    if (bytes_read <= 0)
     {
-        m->msg = -1;
+        msg_in->msg = -1;
         return -1;
     }
-    m->msg = ntohl(s.i.msg);
-    return nb;
+    msg_in->msg = ntohl(msg_struct.i.msg);
+    return bytes_read;
 }
 
-int writeSingleInt(int sock, msgHeaderType h, int i)
+int writeSingleInt(int sock, msgHeaderType hdr, int val)
 { // Build the message and send it!
-    singleIntMsgType s;
-    s.header.clientID = htonl(h.clientID);
-    s.header.opID = htonl(h.opID);
-    s.i.msg = htonl(i);
-    s.header.msgSize = htonl(sizeof(s));
-    size_t nb;
-    nb = send(sock, &s, sizeof(s), 0);
-    if (nb == -1)
+    singleIntMsgType msg_struct;
+    msg_struct.header.clientID = htonl(hdr.clientID);
+    msg_struct.header.opID = htonl(hdr.opID);
+    msg_struct.i.msg = htonl(val);
+    msg_struct.header.msgSize = htonl(sizeof(msg_struct));
+    size_t bytes_sent;
+    bytes_sent = send(sock, &msg_struct, sizeof(msg_struct), 0);
+    if (bytes_sent == -1)
     {
         // Something weird happened! Report and close
         return -1;
     }
-    if (nb == 0)
+    if (bytes_sent == 0)
     {
         // Cannot send! Connection close, Just report and close connection!
         return -1;
     }
-    return nb;
+    return bytes_sent;
 }
 
-int readMultiInt(int sock, msgIntType *m1, msgIntType *m2)
+int readMultiInt(int sock, msgIntType *msg1, msgIntType *msg2)
 { // Simple read/write facilities for SingleInt
-    size_t nb;
-    multiIntMsgType s;
-    nb = recv(sock, &s, sizeof(s), MSG_WAITALL);
-    if (nb <= 0)
+    size_t bytes_sent;
+    multiIntMsgType msg_struct;
+    bytes_sent = recv(sock, &msg_struct, sizeof(msg_struct), MSG_WAITALL);
+    if (bytes_sent <= 0)
     {
-        m1->msg = m2->msg = -1;
+        msg1->msg = msg2->msg = -1;
         return -1;
     }
-    m1->msg = ntohl(s.i.msg1);
-    m2->msg = ntohl(s.i.msg2);
-    return nb;
+    msg1->msg = ntohl(msg_struct.i.msg1);
+    msg2->msg = ntohl(msg_struct.i.msg2);
+    return bytes_sent;
 }
 
-int writeMultiInt(int sock, msgHeaderType h, int i1, int i2)
+int writeMultiInt(int sock, msgHeaderType hdr, int val1, int val2)
 { // Build the message and send it!
-    multiIntMsgType s;
-    s.header.clientID = htonl(h.clientID);
-    s.header.opID = htonl(h.opID);
-    s.i.msg1 = htonl(i1);
-    s.i.msg2 = htonl(i2);
-    s.header.msgSize = htonl(sizeof(s));
-    size_t nb;
-    nb = send(sock, &s, sizeof(s), 0);
-    if (nb == -1)
+    multiIntMsgType msg_struct;
+    msg_struct.header.clientID = htonl(hdr.clientID);
+    msg_struct.header.opID = htonl(hdr.opID);
+    msg_struct.i.msg1 = htonl(val1);
+    msg_struct.i.msg2 = htonl(val2);
+    msg_struct.header.msgSize = htonl(sizeof(msg_struct));
+    size_t bytes_sent;
+    bytes_sent = send(sock, &msg_struct, sizeof(msg_struct), 0);
+    if (bytes_sent == -1)
     {
         // Something weird happened! Report and close
         return -1;
     }
-    if (nb == 0)
+    if (bytes_sent == 0)
     {
         // Cannot send! Connection close, Just report and close connection!
         return -1;
     }
-    return nb;
+    return bytes_sent;
 }
 
 int readSingleString(int sock, msgStringType *str)
@@ -131,43 +125,43 @@ int readSingleString(int sock, msgStringType *str)
     Receive a singleIntFirst (with the size of your string).
     Receive the real string next. No Padding!
        */
-    size_t nb;
-    msgIntType m;
-    nb = readSingleInt(sock, &m); // Skip the header....
-    fprintf(stderr, "The string size was received: %d\n", m.msg);
-    str->msg = (char *)malloc(m.msg + 1);
-    nb = recv(sock, str->msg, m.msg, MSG_WAITALL);
-    fprintf(stderr, "\tReceived stream is {%ld}\n", nb);
+    size_t bytes_sent;
+    msgIntType size_msg;
+    bytes_sent = readSingleInt(sock, &size_msg); // Skip the header....
+    fprintf(stderr, "The string size was received: %d\n", size_msg.msg);
+    str->msg = (char *)malloc(size_msg.msg + 1);
+    bytes_sent = recv(sock, str->msg, size_msg.msg, MSG_WAITALL);
+    fprintf(stderr, "\tReceived stream is {%ld}\n", bytes_sent);
 
-    str->msg[m.msg] = '\0';
+    str->msg[size_msg.msg] = '\0';
     fprintf(stderr, "\tReceived message is {%s}\n", str->msg);
-    return nb;
+    return bytes_sent;
 }
 
-int writeSingleString(int sock, msgHeaderType h, char *str)
+int writeSingleString(int sock, msgHeaderType hdr, char *str)
 {
     /* REDO writeSingleString as follows:
     Send a SingleInteger first. The sent value is the string.
     Send the real string next. No Padding!
      */
 
-    size_t nb;
+    size_t bytes_sent;
     int strSize = strlen(str);
-    nb = writeSingleInt(sock, h, strSize);
-    if (nb == -1)
+    bytes_sent = writeSingleInt(sock, hdr, strSize);
+    if (bytes_sent == -1)
     {
         // Something weird happened! Report and close
         return -1;
     }
-    if (nb == 0)
+    if (bytes_sent == 0)
     {
         // Cannot send! Connection close, Just report and close connection!
         return -1;
     }
 
     fprintf(stderr, "\tSent size notification [%d]\n", strSize);
-    nb = write(2, str, strSize);
-    nb = send(sock, str, strSize, 0);
-    fprintf(stderr, "|\t[%ld/%ld//%ld]\n", nb, sizeof(singleStringType), sizeof(msgStringType));
-    return nb;
+    bytes_sent = write(2, str, strSize);
+    bytes_sent = send(sock, str, strSize, 0);
+    fprintf(stderr, "|\t[%ld/%ld//%ld]\n", bytes_sent, sizeof(singleStringType), sizeof(msgStringType));
+    return bytes_sent;
 }
